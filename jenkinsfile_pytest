@@ -20,26 +20,6 @@ pipeline {
             defaultValue: 'master',
             description: 'Ветка для проверки дубликатов (например feature/duplicates-test)'
         )
-        string(
-            name: 'DB_USER',
-            defaultValue: '',
-            description: 'Логин для подключения к Oracle DB'
-        )
-        password(
-            name: 'DB_PASS',
-            defaultValue: '',
-            description: 'Пароль для подключения к Oracle DB'
-        )
-        string(
-            name: 'GIT_USER',
-            defaultValue: '',
-            description: 'Логин для Bitbucket'
-        )
-        password(
-            name: 'GIT_PASS',
-            defaultValue: '',
-            description: 'Пароль для Bitbucket'
-        )
     }
 
     environment {
@@ -67,35 +47,26 @@ pipeline {
                     python3.7 -m venv venv || true
                     . venv/bin/activate
                     pip3.7 install --upgrade pip -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
-                    pip3.7 install oracledb gitpython requests tomli pytest allure-pytest allure-python-commons -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                    pip3.7 install oracledb gitpython requests tomli -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
                 """
             }
         }
 
         stage('Run Duplicate Checks') {
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'git_pass', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS'),
-                    usernamePassword(credentialsId: 'oracle-db-creds', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS')
-                ]) {
-                    sh """
-                        . venv/bin/activate
-                        rm -rf ${ALLURE_RESULTS}
-                        mkdir -p ${ALLURE_RESULTS}
-                        export DB_USER="${params.DB_USER}"
-                        export DB_PASS="${params.DB_PASS}"
-                        export GIT_USER="${params.GIT_USER}"
-                        export GIT_PASS="${params.GIT_PASS}"
-                        pytest -v --alluredir=${ALLURE_RESULTS} test_duplicates.py
-                    """
-                }
+                sh """
+                    . venv/bin/activate
+                    rm -rf ${ALLURE_RESULTS}
+                    mkdir -p ${ALLURE_RESULTS}
+                    python run_test.py --branch ${BRANCH_NAME}
+                """
             }
         }
     }
 
     post {
         always {
-            // 1. Сохраняем сырые результаты Allure (самое важное!)
+            // 1. Сохраняем сырые результаты в артефакты (самое важное — делаем сразу!)
             archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true, fingerprint: true
 
             // 2. Загружаем сырые результаты в TestOps (до генерации HTML-отчёта)
@@ -116,7 +87,7 @@ pipeline {
                 }
             }
 
-            // 3. Генерируем локальный HTML-отчёт (после загрузки и архивации)
+            // 3. Только теперь генерируем локальный HTML-отчёт
             allure([
                 includeProperties: false,
                 jdk: '',
