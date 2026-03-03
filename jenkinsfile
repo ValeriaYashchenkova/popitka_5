@@ -64,23 +64,28 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            catchError(buildResult: 'SUCCESS', message: 'There are some troubles with withAllureUpload', stageResult: 'UNSTABLE') {
-                script {
-                    allure([
-                        includeProperties: false,
-                        jdk: '',
-                        properties: [],
-                        reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'allure-results']]
-                    ])
-                }
+post {
+    always {
+        // Сначала архив raw-результатов 
+        archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
+
+        // Генерация локального отчёта (после архивации, чтобы не перезаписать)
+        allure([
+            includeProperties: false,
+            jdk: '',
+            properties: [],
+            reportBuildPolicy: 'ALWAYS',
+            results: [[path: 'allure-results']]
+        ])
+
+        // Загрузка raw-результатов в TestOps
+        script {
+            catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
                 withAllureUpload(
                     credentialsId: 'allure-token',
                     name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
                     projectId: '643',
-                    results: [[path: 'allure-results']],
+                    results: [[path: 'allure-results']],  // ← именно raw-папка
                     serverId: 'testops',
                     tags: "${BRANCH_NAME}, sql-duplicates-check",
                     silent: true,
@@ -89,9 +94,8 @@ pipeline {
                     echo "Allure TestOps upload completed"
                 }
             }
-
-            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
-            cleanWs()
         }
+
+        cleanWs()
     }
 }
