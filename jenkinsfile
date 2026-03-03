@@ -64,28 +64,27 @@ pipeline {
         }
     }
 
-post {
-    always {
-        // Сначала архив raw-результатов 
-        archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
+    post {
+        always {
+            // Сначала сохраняем сырые результаты (чтобы они точно попали в артефакты)
+            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true, fingerprint: true
 
-        // Генерация локального отчёта (после архивации, чтобы не перезаписать)
-        allure([
-            includeProperties: false,
-            jdk: '',
-            properties: [],
-            reportBuildPolicy: 'ALWAYS',
-            results: [[path: 'allure-results']]
-        ])
+            // Генерация локального Allure-отчёта
+            allure([
+                includeProperties: false,
+                jdk: '',
+                properties: [],
+                reportBuildPolicy: 'ALWAYS',
+                results: [[path: 'allure-results']]
+            ])
 
-        // Загрузка raw-результатов в TestOps
-        script {
+            // Загрузка сырых результатов в TestOps (по инструкции Qameta)
             catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
                 withAllureUpload(
                     credentialsId: 'allure-token',
                     name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
                     projectId: '643',
-                    results: [[path: 'allure-results']],  // ← именно raw-папка
+                    results: [[path: 'allure-results']],
                     serverId: 'testops',
                     tags: "${BRANCH_NAME}, sql-duplicates-check",
                     silent: true,
@@ -94,8 +93,8 @@ post {
                     echo "Allure TestOps upload completed"
                 }
             }
-        }
 
-        cleanWs()
+            cleanWs()
+        }
     }
 }
