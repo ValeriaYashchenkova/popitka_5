@@ -1,0 +1,19 @@
+[repository]
+url = "https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git"
+local_path = "."
+default_branch = "master"
+
+[database]
+default_dsn = "BIDBTST1:1521/DB12TST2"
+
+[tests]
+tests_directory = "tests"
+test_file_prefix = "check_duplicates_"
+
+[behavior]
+auto_stash = true
+confirm_before_push = true
+
+[testops]
+url = "https://testops.moscow.alfaintra.net"
+project_id = "643"
