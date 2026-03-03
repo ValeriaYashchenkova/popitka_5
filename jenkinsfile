@@ -67,7 +67,7 @@ pipeline {
     post {
         always {
             // Сначала сохраняем сырые результаты (чтобы они точно попали в артефакты)
-            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: 'allure-results.zip', allowEmptyArchive: true, fingerprint: true
 
             // Генерация локального Allure-отчёта
             allure([
