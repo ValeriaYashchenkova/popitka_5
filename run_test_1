@@ -21,18 +21,19 @@ except ImportError:
 CONFIG_FILE = "config.toml"
 
 def load_config():
+    """Загружает config.toml, если он есть. Для Jenkins возвращает пустой dict"""
     if not os.path.exists(CONFIG_FILE):
         return {}
     with open(CONFIG_FILE, "rb") as f:
         return tomllib.load(f)
 
 def get_db_credentials(config):
-    # Сначала из параметров Jenkins (самый приоритетный)
+    """Берёт логин/пароль/DSN сначала из env (Jenkins), потом из config.toml"""
     db_user = os.environ.get('DB_USER')
     db_pass = os.environ.get('DB_PASS')
     dsn = os.environ.get('DB_DSN')
 
-    # Fallback на config.toml (для локального запуска)
+    # Fallback на config.toml для локального запуска
     if not db_user:
         db_user = config.get("database", {}).get("db_user")
     if not db_pass:
@@ -49,6 +50,7 @@ def get_db_credentials(config):
     return db_user, db_pass, dsn
 
 def checkout_and_pull_branch(repo, branch_name):
+    """Переключается на ветку и делает pull с использованием GIT_USER/GIT_PASS из env"""
     git_user = os.environ.get('GIT_USER')
     git_pass = os.environ.get('GIT_PASS')
     
@@ -111,20 +113,21 @@ def run_sql_file(sql_path, db_user, db_pass, dsn):
     
     return status, message, details, file_name
 
-def create_allure_results(results, branch_name):
+def create_allure_results(results, branch_name, config):
+    """Генерирует allure-results с дополнительными файлами для TestOps"""
     allure_dir = "allure-results"
     os.makedirs(allure_dir, exist_ok=True)
     
-    # Добавляем environment.json 
+    # environment.json — помогает TestOps понять окружение
     environment_path = os.path.join(allure_dir, "environment.json")
     with open(environment_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "Python": sys.version,
+            "Python": sys.version.split('\n')[0],
             "Branch": branch_name,
-            "Database": config.get("database", {}).get("default_dsn", "unknown")
+            "Database DSN": config.get("database", {}).get("default_dsn", "unknown")
         }, f, ensure_ascii=False)
 
-    # Добавляем categories.json (для группировки failed/broken)
+    # categories.json — для группировки тестов в отчёте
     categories_path = os.path.join(allure_dir, "categories.json")
     with open(categories_path, 'w', encoding='utf-8') as f:
         json.dump([
@@ -156,18 +159,21 @@ def create_allure_results(results, branch_name):
         
         with open(test_file, 'w', encoding='utf-8') as f:
             json.dump({
+                "uuid": test_uuid,
                 "name": r["file"],
-                "fullName": f"{r['file']} - Duplicate Check",
-                "description": r["message"],
+                "fullName": f"Duplicate Check: {r['file']}",
+                "historyId": str(uuid4()),
+                "testCaseId": str(uuid4()),
                 "status": status_map.get(r["status"], "broken"),
+                "description": r["message"],
+                "start": int(datetime.datetime.now().timestamp() * 1000),
+                "stop": int(datetime.datetime.now().timestamp() * 1000),
                 "steps": [{"name": "Выполнение SQL", "status": status_map.get(r["status"], "broken")}],
                 "attachments": attachments,
-                "labels": [{"name": "branch", "value": branch_name}],
-                "uuid": test_uuid,
-                "historyId": str(uuid4()),  # обязательное для трендов
-                "testCaseId": str(uuid4()),  # обязательное для уникальности
-                "start": int(datetime.datetime.now().timestamp() * 1000),
-                "stop": int(datetime.datetime.now().timestamp() * 1000)
+                "labels": [
+                    {"name": "branch", "value": branch_name},
+                    {"name": "framework", "value": "sql-duplicates-check"}
+                ]
             }, f, ensure_ascii=False)
 
 def main():
@@ -205,7 +211,7 @@ def main():
         status, message, details, fname = run_sql_file(sql_path, db_user, db_pass, dsn)
         results.append({"status": status, "message": message, "details": details, "file": fname})
     
-    create_allure_results(results, branch_name)
+    create_allure_results(results, branch_name, config)
     
     print("\nГотово! Папка allure-results создана.")
     print("Jenkins сам загрузит её в TestOps.")
