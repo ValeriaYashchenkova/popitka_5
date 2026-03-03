@@ -1,0 +1,70 @@
+pipeline {
+    agent {
+        kubernetes {
+            label 'pytest-allure'
+            defaultContainer 'python'
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: python
+    image: python:3.11
+    command:
+    - cat
+    tty: true
+"""
+        }
+    }
+
+    environment {
+        ALLURE_ENDPOINT = "https://testops.moscow.alfaintra.net"
+        ALLURE_PROJECT_ID = "YOUR_PROJECT_ID"
+        ALLURE_RESULTS = "allure-results"
+    }
+
+    stages {
+
+        stage('Install dependencies') {
+            steps {
+                container('python') {
+                    sh '''
+                        python -m pip install --upgrade pip
+                        pip install pytest allure-pytest
+                    '''
+                }
+            }
+        }
+
+        stage('Run tests') {
+            steps {
+                container('python') {
+                    sh '''
+                        mkdir -p ${ALLURE_RESULTS}
+                        pytest tests/ --alluredir=${ALLURE_RESULTS}
+                    '''
+                }
+            }
+        }
+
+        stage('Upload to Allure TestOps') {
+            steps {
+                withAllureUpload(
+                    credentialsId: 'allure-token',
+                    projectId: "${ALLURE_PROJECT_ID}",
+                    results: [[path: "${ALLURE_RESULTS}"]],
+                    serverId: '643'
+                ) {
+                    echo "Uploading results to Allure TestOps..."
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'allure-results/**', fingerprint: true
+            cleanWs()
+        }
+    }
+}
