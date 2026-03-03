@@ -65,38 +65,38 @@ pipeline {
     }
 
     post {
-    always {
-        script {
-            sh """
-                zip -r allure-results.zip allure-results
-            """
-        }
+        always {
+            // 1. Сохраняем сырые результаты сразу после скрипта (самое важное!)
+            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true, fingerprint: true
 
-        archiveArtifacts artifacts: 'allure-results.zip', allowEmptyArchive: true
-
-        allure([
-            includeProperties: false,
-            jdk: '',
-            properties: [],
-            reportBuildPolicy: 'ALWAYS',
-            results: [[path: 'allure-results']]
-        ])
-
-        catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
-            withAllureUpload(
-                credentialsId: 'allure-token',
-                name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
-                projectId: '643',
-                results: [[path: 'allure-results']],
-                serverId: 'testops',
-                tags: "${BRANCH_NAME}, sql-duplicates-check",
-                silent: true,
-                indexExistingFiles: true
-            ) {
-                echo "Allure TestOps upload completed"
+            // 2. Загружаем сырые результаты в TestOps (до генерации HTML)
+            script {
+                catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
+                    withAllureUpload(
+                        credentialsId: 'allure-token',
+                        name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
+                        projectId: '643',
+                        results: [[path: 'allure-results']],
+                        serverId: 'testops',
+                        tags: "${BRANCH_NAME}, sql-duplicates-check",
+                        silent: true,
+                        indexExistingFiles: true
+                    ) {
+                        echo "Allure TestOps upload completed"
+                    }
+                }
             }
-        }
 
-        cleanWs()
+            // 3. Генерируем локальный HTML-отчёт (после загрузки и архивации)
+            allure([
+                includeProperties: false,
+                jdk: '',
+                properties: [],
+                reportBuildPolicy: 'ALWAYS',
+                results: [[path: 'allure-results']]
+            ])
+
+            cleanWs()
+        }
     }
 }
