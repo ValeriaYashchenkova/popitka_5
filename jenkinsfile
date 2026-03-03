@@ -65,36 +65,38 @@ pipeline {
     }
 
     post {
-        always {
-            // Сначала сохраняем сырые результаты (чтобы они точно попали в артефакты)
-            archiveArtifacts artifacts: 'allure-results.zip', allowEmptyArchive: true, fingerprint: true
-
-            // Генерация локального Allure-отчёта
-            allure([
-                includeProperties: false,
-                jdk: '',
-                properties: [],
-                reportBuildPolicy: 'ALWAYS',
-                results: [[path: 'allure-results']]
-            ])
-
-            // Загрузка сырых результатов в TestOps (по инструкции Qameta)
-            catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
-                withAllureUpload(
-                    credentialsId: 'allure-token',
-                    name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
-                    projectId: '643',
-                    results: [[path: 'allure-results']],
-                    serverId: 'testops',
-                    tags: "${BRANCH_NAME}, sql-duplicates-check",
-                    silent: true,
-                    indexExistingFiles: true
-                ) {
-                    echo "Allure TestOps upload completed"
-                }
-            }
-
-            cleanWs()
+    always {
+        script {
+            sh """
+                zip -r allure-results.zip allure-results
+            """
         }
+
+        archiveArtifacts artifacts: 'allure-results.zip', allowEmptyArchive: true
+
+        allure([
+            includeProperties: false,
+            jdk: '',
+            properties: [],
+            reportBuildPolicy: 'ALWAYS',
+            results: [[path: 'allure-results']]
+        ])
+
+        catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
+            withAllureUpload(
+                credentialsId: 'allure-token',
+                name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
+                projectId: '643',
+                results: [[path: 'allure-results']],
+                serverId: 'testops',
+                tags: "${BRANCH_NAME}, sql-duplicates-check",
+                silent: true,
+                indexExistingFiles: true
+            ) {
+                echo "Allure TestOps upload completed"
+            }
+        }
+
+        cleanWs()
     }
 }
