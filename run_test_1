@@ -8,8 +8,8 @@ import json
 import argparse
 import time
 import warnings
-import zipfile
-import requests
+import socket
+import threading
 
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
@@ -20,20 +20,19 @@ except ImportError:
 
 CONFIG_FILE = "config.toml"
 
+
 def load_config():
-    """Загружает config.toml, если он есть. Для Jenkins возвращает пустой dict"""
     if not os.path.exists(CONFIG_FILE):
         return {}
     with open(CONFIG_FILE, "rb") as f:
         return tomllib.load(f)
 
+
 def get_db_credentials(config):
-    """Берёт логин/пароль/DSN сначала из env (Jenkins), потом из config.toml"""
     db_user = os.environ.get('DB_USER')
     db_pass = os.environ.get('DB_PASS')
     dsn = os.environ.get('DB_DSN')
 
-    # Fallback на config.toml для локального запуска
     if not db_user:
         db_user = config.get("database", {}).get("db_user")
     if not db_pass:
@@ -43,178 +42,187 @@ def get_db_credentials(config):
 
     if not db_user or not db_pass or not dsn:
         print("Ошибка: не найдены DB_USER, DB_PASS или DB_DSN")
-        print("Укажите их в параметрах билда Jenkins или в config.toml")
         sys.exit(1)
 
-    print("Логин/пароль/DSN к БД взяты из параметров Jenkins или config.toml")
+    print("Логин/пароль/DSN к БД взяты из Jenkins или config.toml")
     return db_user, db_pass, dsn
 
+
 def checkout_and_pull_branch(repo, branch_name):
-    """Переключается на ветку и делает pull с использованием GIT_USER/GIT_PASS из env"""
     git_user = os.environ.get('GIT_USER')
     git_pass = os.environ.get('GIT_PASS')
-    
+
     if not git_user or not git_pass:
-        print("Ошибка: GIT_USER или GIT_PASS не установлены в окружении (параметры Jenkins)")
+        print("Ошибка: GIT_USER или GIT_PASS не установлены")
         sys.exit(1)
-    
-    print("Используем git-креды из параметров Jenkins (GIT_USER/GIT_PASS)")
-    
+
     auth_url = f"https://{git_user}:{git_pass}@git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git"
-    
     repo.remotes.origin.config_writer.set("url", auth_url)
-    
+
     try:
-        print("Выполняем git fetch...")
         repo.remotes.origin.fetch()
-        
-        remote_branches = {ref.name.split('/')[-1] for ref in repo.remotes.origin.refs}
-        
-        if branch_name not in remote_branches:
-            print(f"Ветка '{branch_name}' не найдена")
-            print("Доступные:", ", ".join(sorted(remote_branches)) or "— пусто —")
-            sys.exit(1)
-        
-        print(f"Переключаемся на ветку: {branch_name}")
         repo.git.checkout(branch_name)
-        
-        print(f"Подтягиваем изменения...")
         repo.git.pull('origin', branch_name)
-        
     except git.exc.GitCommandError as e:
-        print(f"Ошибка git-команды: {e}")
-        print(f"Команда: {e.command}")
-        print(f"Вывод ошибки: {e.stderr}")
+        print(f"Ошибка git: {e}")
         sys.exit(1)
+
 
 def run_sql_file(sql_path, db_user, db_pass, dsn):
     file_name = os.path.basename(sql_path)
     status = "passed"
     message = "OK — дубликатов не найдено"
     details = ""
-    
+
+    start_time = int(time.time() * 1000)
+
     try:
         conn = oracledb.connect(user=db_user, password=db_pass, dsn=dsn)
         cursor = conn.cursor()
         sql = open(sql_path, 'r', encoding='utf-8').read().rstrip(' \n;')
         cursor.execute(sql)
         rows = cursor.fetchall()
-        
+
         if rows:
             status = "failed"
             message = f"Найдено {len(rows)} наборов дубликатов"
             details = "\n".join(str(row) for row in rows)
-        
+
         conn.close()
+
     except oracledb.Error as e:
         status = "broken"
         message = "Ошибка выполнения"
         details = str(e)
-    
-    return status, message, details, file_name
 
-def create_allure_results(results, branch_name, config):
-    """Генерирует allure-results с дополнительными файлами для TestOps"""
+    stop_time = int(time.time() * 1000)
+
+    return status, message, details, file_name, start_time, stop_time
+
+
+def create_allure_results(results, branch_name):
     allure_dir = "allure-results"
     os.makedirs(allure_dir, exist_ok=True)
-    
-    # environment.json — помогает TestOps понять окружение
-    environment_path = os.path.join(allure_dir, "environment.json")
-    with open(environment_path, 'w', encoding='utf-8') as f:
-        json.dump({
-            "Python": sys.version.split('\n')[0],
-            "Branch": branch_name,
-            "Database DSN": config.get("database", {}).get("default_dsn", "unknown")
-        }, f, ensure_ascii=False)
-
-    # categories.json — для группировки тестов в отчёте
-    categories_path = os.path.join(allure_dir, "categories.json")
-    with open(categories_path, 'w', encoding='utf-8') as f:
-        json.dump([
-            {
-                "name": "Broken",
-                "matchedStatuses": ["broken"],
-                "messageRegex": ".*"
-            },
-            {
-                "name": "Failed",
-                "matchedStatuses": ["failed"],
-                "messageRegex": ".*"
-            }
-        ], f, ensure_ascii=False)
 
     for r in results:
         test_uuid = str(uuid4())
-        test_file = os.path.join(allure_dir, f"{test_uuid}-result.json")
-        
-        status_map = {"passed": "passed", "failed": "failed", "broken": "broken"}
-        
+        container_uuid = str(uuid4())
+
         attachments = []
+
         if r["details"]:
             attach_filename = f"{test_uuid}-details.txt"
             attach_path = os.path.join(allure_dir, attach_filename)
             with open(attach_path, 'w', encoding='utf-8') as f:
                 f.write(r["details"])
-            attachments = [{"name": "Детали", "source": attach_filename, "type": "text/plain"}]
-        
-        with open(test_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                "uuid": test_uuid,
-                "name": r["file"],
-                "fullName": f"Duplicate Check: {r['file']}",
-                "historyId": str(uuid4()),
-                "testCaseId": str(uuid4()),
-                "status": status_map.get(r["status"], "broken"),
-                "description": r["message"],
-                "start": int(datetime.datetime.now().timestamp() * 1000),
-                "stop": int(datetime.datetime.now().timestamp() * 1000),
-                "steps": [{"name": "Выполнение SQL", "status": status_map.get(r["status"], "broken")}],
-                "attachments": attachments,
-                "labels": [
-                    {"name": "branch", "value": branch_name},
-                    {"name": "framework", "value": "sql-duplicates-check"}
-                ]
-            }, f, ensure_ascii=False)
+
+            attachments.append({
+                "name": "Details",
+                "source": attach_filename,
+                "type": "text/plain"
+            })
+
+        status_map = {
+            "passed": "passed",
+            "failed": "failed",
+            "broken": "broken"
+        }
+
+        # ---------- RESULT ----------
+        result_data = {
+            "uuid": test_uuid,
+            "historyId": r["file"],  # стабильная история по имени файла
+            "name": r["file"],
+            "fullName": f"Duplicate Check: {r['file']}",
+            "status": status_map.get(r["status"], "broken"),
+            "stage": "finished",
+            "description": r["message"],
+            "start": r["start"],
+            "stop": r["stop"],
+            "steps": [
+                {
+                    "name": "Execute SQL",
+                    "status": status_map.get(r["status"], "broken"),
+                    "stage": "finished",
+                    "start": r["start"],
+                    "stop": r["stop"]
+                }
+            ],
+            "attachments": attachments,
+            "labels": [
+                {"name": "framework", "value": "custom-sql"},
+                {"name": "language", "value": "python"},
+                {"name": "suite", "value": "SQL Duplicate Checks"},
+                {"name": "host", "value": socket.gethostname()},
+                {"name": "thread", "value": threading.current_thread().name},
+                {"name": "branch", "value": branch_name}
+            ]
+        }
+
+        with open(os.path.join(allure_dir, f"{test_uuid}-result.json"), 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, ensure_ascii=False)
+
+        # ---------- CONTAINER ----------
+        container_data = {
+            "uuid": container_uuid,
+            "children": [test_uuid],
+            "befores": [],
+            "afters": [],
+            "start": r["start"],
+            "stop": r["stop"]
+        }
+
+        with open(os.path.join(allure_dir, f"{container_uuid}-container.json"), 'w', encoding='utf-8') as f:
+            json.dump(container_data, f, ensure_ascii=False)
+
+    print("Allure results generated correctly for TestOps.")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Запуск проверки дубликатов по SQL-скриптам")
-    parser.add_argument('--branch', required=True, help='Название ветки (обязательно для Jenkins)')
+    parser = argparse.ArgumentParser(description="Запуск проверки дубликатов")
+    parser.add_argument('--branch', required=True)
     args = parser.parse_args()
 
     config = load_config()
-    repo_path = "."  # в Jenkins — корень workspace
-    
+    repo_path = "."
+
     if not os.path.exists(os.path.join(repo_path, ".git")):
-        print("Репозиторий не найден в текущей директории")
+        print("Репозиторий не найден")
         sys.exit(1)
-    
+
     repo = git.Repo(repo_path)
-    
-    branch_name = args.branch
-    checkout_and_pull_branch(repo, branch_name)
-    
+    checkout_and_pull_branch(repo, args.branch)
+
     tests_dir = os.path.join(repo_path, config["tests"]["tests_directory"])
     sql_files = [f for f in os.listdir(tests_dir) if f.endswith('.sql')]
-    
+
     if not sql_files:
-        print("SQL-скрипты не найдены")
+        print("SQL-файлы не найдены")
         sys.exit(1)
-    
+
     db_user, db_pass, dsn = get_db_credentials(config)
-    
+
     results = []
-    
+
     print("\nВыполняю проверки...")
     for sql_file in sql_files:
         sql_path = os.path.join(tests_dir, sql_file)
         print(f"→ {sql_file}")
-        status, message, details, fname = run_sql_file(sql_path, db_user, db_pass, dsn)
-        results.append({"status": status, "message": message, "details": details, "file": fname})
-    
-    create_allure_results(results, branch_name, config)
-    
+        status, message, details, fname, start, stop = run_sql_file(sql_path, db_user, db_pass, dsn)
+
+        results.append({
+            "status": status,
+            "message": message,
+            "details": details,
+            "file": fname,
+            "start": start,
+            "stop": stop
+        })
+
+    create_allure_results(results, args.branch)
+
     print("\nГотово! Папка allure-results создана.")
-    print("Jenkins сам загрузит её в TestOps.")
+
 
 if __name__ == "__main__":
     main()
