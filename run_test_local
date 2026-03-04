@@ -1,29 +1,58 @@
+# run_test.py — локальная версия для запуска pytest + Allure
 import os
 import sys
 import getpass
 import oracledb
 import pytest
 import allure
+import git
 from glob import glob
+from pathlib import Path
 
 # =============================================
-# Запрос логина и пароля к БД (один раз)
+# 1. Запрос параметров подключения к БД
 # =============================================
 
-print("\n=== Ввод параметров для подключения к БД ===")
+print("\n" + "="*60)
+print(" ЛОКАЛЬНЫЙ ЗАПУСК ТЕСТОВ НА ДУБЛИКАТЫ ")
+print("="*60)
+
 DB_USER = input("Логин Oracle DB: ").strip()
 DB_PASS = getpass.getpass("Пароль Oracle DB: ").strip()
 DB_DSN = input("DSN (по умолчанию BIDBTST1:1521/DB12TST2): ").strip() or "BIDBTST1:1521/DB12TST2"
 
 # =============================================
-# Фикстура подключения к БД
+# 2. Переключение на нужную ветку (если указана)
+# =============================================
+
+def checkout_branch(branch_name):
+    repo_path = Path(".")
+    if not (repo_path / ".git").exists():
+        print("Текущая папка не является git-репозиторием!")
+        sys.exit(1)
+    
+    repo = git.Repo(repo_path)
+    
+    try:
+        print(f"\nПереключаемся на ветку: {branch_name}")
+        repo.git.checkout(branch_name)
+        print("Подтягиваем последние изменения...")
+        repo.git.pull('origin', branch_name)
+        print("Готово!")
+    except git.exc.GitCommandError as e:
+        print(f"Ошибка git: {e}")
+        print("Возможно, ветка не существует или нет доступа.")
+        sys.exit(1)
+
+# =============================================
+# 3. Фикстура подключения к БД
 # =============================================
 
 @pytest.fixture(scope="session")
 def db_connection():
     try:
         conn = oracledb.connect(user=DB_USER, password=DB_PASS, dsn=DB_DSN)
-        print("Подключение к БД успешно!")
+        print("Подключение к БД успешно установлено!")
         yield conn
     except oracledb.Error as e:
         pytest.fail(f"Ошибка подключения к БД: {e}")
@@ -31,49 +60,56 @@ def db_connection():
         conn.close()
 
 # =============================================
-# Список всех .sql-файлов
+# 4. Список всех .sql-файлов
 # =============================================
 
 def get_sql_files():
-    tests_dir = "tests"  # или путь к твоей папке с .sql
-    return sorted(glob(os.path.join(tests_dir, "check_duplicates_*.sql")))
+    tests_dir = "tests"  # папка с .sql-файлами
+    sql_files = glob(os.path.join(tests_dir, "check_duplicates_*.sql"))
+    if not sql_files:
+        print("SQL-тесты не найдены в папке 'tests/'")
+        sys.exit(1)
+    return sorted(sql_files)
 
 # =============================================
-# Один тест на каждый .sql-файл
+# 5. Один тест на каждый .sql-файл
 # =============================================
 
 @pytest.mark.parametrize("sql_file", get_sql_files(), ids=lambda x: os.path.basename(x))
-def test_duplicate_check(sql_file, db_connection):
+def test_duplicate_check(sql_file, db_connection, request):
     file_name = os.path.basename(sql_file)
     
-    @allure.title(f"Проверка дубликатов в таблице/файле: {file_name}")
+    @allure.title(f"Проверка дубликатов: {file_name}")
     @allure.description(f"""
-    Выполняем SQL-запрос из файла **{file_name}**  
-    Ожидаем, что результат будет пустым (дубликатов нет).
+    Выполняется SQL-запрос из файла **{file_name}**.  
+    Ожидаемый результат: пустой набор строк (дубликатов нет).  
+    Если дубликаты найдены — тест упадёт с прикреплёнными деталями.
     """)
     @allure.severity(allure.severity_level.NORMAL)
     @allure.tag("duplicates", "sql", "database", "regression")
     @allure.label("owner", "Валерия Ященкова")
     def run_test():
-        with allure.step(f"Чтение и выполнение SQL из файла {file_name}"):
+        with allure.step(f"Чтение SQL-запроса из файла {file_name}"):
             sql = open(sql_file, 'r', encoding='utf-8').read().rstrip(' \n;')
+        
+        with allure.step("Выполнение SQL-запроса"):
             cursor = db_connection.cursor()
             cursor.execute(sql)
             rows = cursor.fetchall()
-            
-            if rows:
-                details = "\n".join(str(row) for row in rows)
-                allure.attach(
-                    details,
-                    name="Найденные дубликаты",
-                    attachment_type=allure.attachment_type.TEXT
-                )
-                pytest.fail(f"Найдено {len(rows)} наборов дубликатов")
-            else:
-                allure.attach(
-                    "Дубликатов не найдено — всё OK",
-                    name="Результат",
-                    attachment_type=allure.attachment_type.TEXT
-                )
+        
+        if rows:
+            details = "\n".join(str(row) for row in rows)
+            allure.attach(
+                details,
+                name="Найденные дубликаты",
+                attachment_type=allure.attachment_type.TEXT
+            )
+            pytest.fail(f"Найдено {len(rows)} наборов дубликатов")
+        else:
+            allure.attach(
+                "Дубликатов не найдено — всё в порядке",
+                name="Результат проверки",
+                attachment_type=allure.attachment_type.TEXT
+            )
     
     run_test()
