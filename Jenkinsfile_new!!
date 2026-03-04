@@ -12,6 +12,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
+        timeout(time: 60, unit: 'MINUTES')
     }
 
     parameters {
@@ -38,27 +39,41 @@ pipeline {
     }
 
     stages {
-        stage('Create venv & Install dependencies') {
+        stage('Prepare & Install dependencies') {
             steps {
-                sh """
-                    python3.7 -m venv venv || true
+                sh '''
+                    python3 -m venv venv || true
                     . venv/bin/activate
-                    pip3.7 install --upgrade pip -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
-                    pip3.7 install oracledb pytest allure-pytest -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
-                """
+                    pip install --upgrade pip setuptools wheel \
+                        -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                    
+                    pip install oracledb pytest allure-pytest \
+                        -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                '''
             }
         }
 
-        stage('Run Database Tests') {
+        stage('Run tests') {
             steps {
-                sh """
+                sh '''
                     . venv/bin/activate
-                    rm -rf ${ALLURE_RESULTS} || true
-                    mkdir -p ${ALLURE_RESULTS}
+                    
+                    echo "Current directory:"
+                    pwd
+                    
+                    echo "Files in tests/:"
+                    ls -la tests/ || echo "Папка tests/ не найдена"
+                    
+                    rm -rf "${ALLURE_RESULTS}" || true
+                    mkdir -p "${ALLURE_RESULTS}"
+                    
                     export DB_USER="${params.DB_USER}"
                     export DB_PASS="${params.DB_PASS}"
-                    pytest tests/ --alluredir=${ALLURE_RESULTS} || echo "Tests failed, but continuing to publish report"
-                """
+                    
+                    pytest tests/ \
+                        --alluredir="${ALLURE_RESULTS}" \
+                        || echo "Тесты завершились с ошибкой, но отчёт будет опубликован"
+                '''
             }
         }
     }
@@ -76,20 +91,25 @@ pipeline {
                     echo "Uploading results to Allure TestOps..."
                     withAllureUpload(
                         credentialsId: 'allure-token',
-                        name: "Database Tests #${BUILD_NUMBER} | ${params.BRANCH_NAME}",
+                        name: "DB Tests #${BUILD_NUMBER} | ${params.BRANCH_NAME}",
                         projectId: '643',
                         results: [[path: "${ALLURE_RESULTS}"]],
                         serverId: 'testops',
-                        tags: "${params.BRANCH_NAME}, db-tests, data-quality"
+                        tags: "${params.BRANCH_NAME}, oracle, data-quality"
                     ) {
                         echo "Allure TestOps upload completed"
                     }
                 } catch (Exception e) {
-                    echo "Failed to upload to Allure TestOps: ${e.getMessage()}"
+                    echo "Не удалось загрузить в Allure TestOps: ${e.message}"
                 }
             }
 
-            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
+            archiveArtifacts(
+                artifacts: 'allure-results/**',
+                allowEmptyArchive: true,
+                fingerprint: true
+            )
+
             cleanWs()
         }
     }
