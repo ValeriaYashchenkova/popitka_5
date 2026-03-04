@@ -1,4 +1,4 @@
-# run_test.py — локальная версия для запуска pytest + Allure
+# run_test.py — ЛОКАЛЬНАЯ ВЕРСИЯ с вводом логина/пароля и красивым Allure-отчётом
 import os
 import sys
 import getpass
@@ -10,39 +10,43 @@ from glob import glob
 from pathlib import Path
 
 # =============================================
-# 1. Запрос параметров подключения к БД
+# 1. Запрос параметров подключения к БД (один раз в начале)
 # =============================================
 
-print("\n" + "="*60)
-print(" ЛОКАЛЬНЫЙ ЗАПУСК ТЕСТОВ НА ДУБЛИКАТЫ ")
-print("="*60)
+print("\n" + "="*70)
+print(" ЛОКАЛЬНЫЙ ЗАПУСК ТЕСТОВ НА ДУБЛИКАТЫ (pytest + Allure) ")
+print("="*70 + "\n")
 
 DB_USER = input("Логин Oracle DB: ").strip()
 DB_PASS = getpass.getpass("Пароль Oracle DB: ").strip()
-DB_DSN = input("DSN (по умолчанию BIDBTST1:1521/DB12TST2): ").strip() or "BIDBTST1:1521/DB12TST2"
+DB_DSN = input("DSN (Enter для дефолтного BIDBTST1:1521/DB12TST2): ").strip() or "BIDBTST1:1521/DB12TST2"
 
 # =============================================
-# 2. Переключение на нужную ветку (если указана)
+# 2. Переключение на нужную ветку (если указана --branch)
 # =============================================
 
-def checkout_branch(branch_name):
+def checkout_branch(branch_name=None):
     repo_path = Path(".")
     if not (repo_path / ".git").exists():
-        print("Текущая папка не является git-репозиторием!")
+        print("Ошибка: текущая папка не является git-репозиторием!")
+        print("Перейдите в корень проекта с .git")
         sys.exit(1)
     
     repo = git.Repo(repo_path)
     
-    try:
-        print(f"\nПереключаемся на ветку: {branch_name}")
-        repo.git.checkout(branch_name)
-        print("Подтягиваем последние изменения...")
-        repo.git.pull('origin', branch_name)
-        print("Готово!")
-    except git.exc.GitCommandError as e:
-        print(f"Ошибка git: {e}")
-        print("Возможно, ветка не существует или нет доступа.")
-        sys.exit(1)
+    if branch_name:
+        try:
+            print(f"\nПереключаемся на ветку: {branch_name}")
+            repo.git.checkout(branch_name)
+            print("Подтягиваем последние изменения...")
+            repo.git.pull('origin', branch_name)
+            print("Готово!\n")
+        except git.exc.GitCommandError as e:
+            print(f"Ошибка git: {e}")
+            print("Возможно, ветка не существует или нет доступа.")
+            sys.exit(1)
+    else:
+        print("Ветка не указана — используем текущую")
 
 # =============================================
 # 3. Фикстура подключения к БД
@@ -65,25 +69,25 @@ def db_connection():
 
 def get_sql_files():
     tests_dir = "tests"  # папка с .sql-файлами
-    sql_files = glob(os.path.join(tests_dir, "check_duplicates_*.sql"))
+    sql_files = sorted(glob(os.path.join(tests_dir, "check_duplicates_*.sql")))
     if not sql_files:
         print("SQL-тесты не найдены в папке 'tests/'")
         sys.exit(1)
-    return sorted(sql_files)
+    return sql_files
 
 # =============================================
-# 5. Один тест на каждый .sql-файл
+# 5. Один тест на каждый .sql-файл (в стиле твоего примера)
 # =============================================
 
 @pytest.mark.parametrize("sql_file", get_sql_files(), ids=lambda x: os.path.basename(x))
 def test_duplicate_check(sql_file, db_connection, request):
     file_name = os.path.basename(sql_file)
     
-    @allure.title(f"Проверка дубликатов: {file_name}")
+    @allure.title(f"Проверка дубликатов в файле: {file_name}")
     @allure.description(f"""
     Выполняется SQL-запрос из файла **{file_name}**.  
-    Ожидаемый результат: пустой набор строк (дубликатов нет).  
-    Если дубликаты найдены — тест упадёт с прикреплёнными деталями.
+    Цель: убедиться, что в таблице **нет дубликатов** по ключевым полям.  
+    Ожидаемый результат: пустой набор строк.
     """)
     @allure.severity(allure.severity_level.NORMAL)
     @allure.tag("duplicates", "sql", "database", "regression")
