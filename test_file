@@ -1,4 +1,17 @@
 # tests/test_no_duplicates_in_acounteqtype_ldim.py
+# Установка (если ещё не стоят)
+pip install pytest pytest-allure-adapter oracledb allure-pytest
+
+# Запуск тестов + генерация allure-отчёта
+pytest tests/test_no_duplicates_in_acounteqtype_ldim.py \
+  --alluredir=allure-results
+
+# Просмотр красивого отчёта
+allure serve allure-results
+# или
+allure generate allure-results -o allure-report --clean
+# потом открыть allure-report/index.html
+
 
 import pytest
 import allure
