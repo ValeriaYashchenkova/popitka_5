@@ -18,7 +18,17 @@ pipeline {
         string(
             name: 'BRANCH_NAME',
             defaultValue: 'master',
-            description: 'Ветка для проверки дубликатов (например feature/duplicates-test)'
+            description: 'Ветка для проверки дубликатов'
+        )
+        string(
+            name: 'DB_USER',
+            defaultValue: '',
+            description: 'Логин для подключения к Oracle DB'
+        )
+        password(
+            name: 'DB_PASS',
+            defaultValue: '',
+            description: 'Пароль для подключения к Oracle DB'
         )
     }
 
@@ -47,7 +57,7 @@ pipeline {
                     python3.7 -m venv venv || true
                     . venv/bin/activate
                     pip3.7 install --upgrade pip -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
-                    pip3.7 install oracledb gitpython requests tomli -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                    pip3.7 install oracledb gitpython requests tomli pytest allure-pytest -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
                 """
             }
         }
@@ -58,7 +68,9 @@ pipeline {
                     . venv/bin/activate
                     rm -rf ${ALLURE_RESULTS}
                     mkdir -p ${ALLURE_RESULTS}
-                    python run_test.py --branch ${BRANCH_NAME}
+                    export DB_USER="${params.DB_USER}"
+                    export DB_PASS="${params.DB_PASS}"
+                    pytest run_test.py --alluredir=${ALLURE_RESULTS}
                 """
             }
         }
@@ -66,36 +78,29 @@ pipeline {
 
     post {
         always {
-            // 1. Сохраняем сырые результаты в артефакты (самое важное — делаем сразу!)
-            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true, fingerprint: true
+            allure includeProperties: false,
+                   jdk: '',
+                   results: [[path: 'allure-results']]
 
-            // 2. Загружаем сырые результаты в TestOps (до генерации HTML-отчёта)
             script {
-                catchError(buildResult: 'SUCCESS', message: 'Problems with TestOps upload', stageResult: 'UNSTABLE') {
+                try {
+                    echo "Uploading results to Allure TestOps..."
                     withAllureUpload(
                         credentialsId: 'allure-token',
                         name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
                         projectId: '643',
-                        results: [[path: 'allure-results']],
+                        results: [[path: "${WORKSPACE}/allure-results"]],
                         serverId: 'testops',
-                        tags: "${BRANCH_NAME}, sql-duplicates-check",
-                        silent: true,
-                        indexExistingFiles: true
+                        tags: "${BRANCH_NAME}, sql-duplicates-check"
                     ) {
                         echo "Allure TestOps upload completed"
                     }
+                } catch (Exception e) {
+                    echo "Failed to upload to Allure TestOps: ${e}"
                 }
             }
 
-            // 3. Только теперь генерируем локальный HTML-отчёт
-            allure([
-                includeProperties: false,
-                jdk: '',
-                properties: [],
-                reportBuildPolicy: 'ALWAYS',
-                results: [[path: 'allure-results']]
-            ])
-
+            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
             cleanWs()
         }
     }
