@@ -1,0 +1,105 @@
+# tests/test_no_duplicates_in_acounteqtype_ldim.py
+
+import pytest
+import allure
+import oracledb
+from typing import List, Tuple
+
+
+# -------------------------------------------------------------------------
+#  Фикстуры
+# -------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def oracle_connection() -> oracledb.Connection:
+    """Создаёт и возвращает соединение с базой. Закрывает после всех тестов."""
+    # Здесь вы потом подставите настоящие значения
+    user = "read"
+    password = "read"
+    dsn = "BIDBTST1:1521/DB12TST2"
+
+    try:
+        conn = oracledb.connect(user=user, password=password, dsn=dsn)
+        allure.attach(f"Подключились к {dsn} пользователем {user}", attachment_type=allure.attachment_type.TEXT)
+        yield conn
+    except oracledb.Error as e:
+        allure.attach(str(e), name="Ошибка подключения", attachment_type=allure.attachment_type.TEXT)
+        pytest.fail(f"Не удалось подключиться к базе: {e}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
+            allure.attach("Соединение с базой закрыто", attachment_type=allure.attachment_type.TEXT)
+
+
+@pytest.fixture
+def duplicates_query() -> str:
+    return """
+    SELECT UK, COUNT(*) AS cnt
+    FROM DMALM.ACCOUNTEQTYPE_LDIM
+    GROUP BY UK
+    HAVING COUNT(*) > 1
+    ORDER BY cnt DESC
+    """
+
+
+# -------------------------------------------------------------------------
+#  Сам тест
+# -------------------------------------------------------------------------
+
+@allure.epic("Проверка качества данных")
+@allure.feature("DMALM.ACCOUNTEQTYPE_LDIM")
+@allure.story("Отсутствие дублей по полю UK")
+@allure.title("В таблице ACCOUNTEQTYPE_LDIM не должно быть дублей по UK")
+@allure.description(
+    "Проверяем, что запрос на поиск дублей возвращает пустой результат.\n"
+    "Если есть хотя бы одна строка → тест падает + прикладываем результат в отчёт."
+)
+@allure.severity(allure.severity_level.CRITICAL)
+@allure.label("layer", "integration")
+@allure.tag("oracle", "data-quality", "deduplication")
+def test_no_duplicates_by_uk(oracle_connection: oracledb.Connection, duplicates_query: str):
+    
+    with allure.step("Выполняем запрос на поиск дублей"):
+        cursor = oracle_connection.cursor()
+        cursor.execute(duplicates_query)
+        rows: List[Tuple[str, int]] = cursor.fetchall()
+        cursor.close()
+
+    count_duplicates = len(rows)
+
+    # Прикладываем результат в любом случае (удобно для анализа)
+    if rows:
+        table_md = "| UK | Кол-во повторений |\n|----|--------------------|\n"
+        for uk, cnt in rows:
+            table_md += f"| {uk} | {cnt} |\n"
+        allure.attach(table_md, name="Найденные дубли", attachment_type=allure.attachment_type.MARKDOWN)
+    else:
+        allure.attach("Дублей не найдено ✓", attachment_type=allure.attachment_type.TEXT)
+
+    with allure.step(f"Проверяем, что дублей нет (найдено: {count_duplicates})"):
+        assert count_duplicates == 0, f"Обнаружено {count_duplicates} групп с дублирующимся UK"
+
+
+# -------------------------------------------------------------------------
+#  Дополнительный удобный тест — просто покажет топ-дубли (не падает)
+# -------------------------------------------------------------------------
+
+@allure.title("Показать топ-10 дублей по UK (информационный)")
+@allure.description("Не падает, просто выводит в отчёт самые большие группы дублей, если они есть")
+def test_show_top_duplicates(oracle_connection: oracledb.Connection, duplicates_query: str):
+    
+    with allure.step("Выполняем запрос"):
+        cursor = oracle_connection.cursor()
+        cursor.execute(duplicates_query)
+        rows = cursor.fetchmany(10)  # только топ-10
+        cursor.close()
+
+    if not rows:
+        allure.attach("Дублей нет", name="Результат", attachment_type=allure.attachment_type.TEXT)
+        return
+
+    table_md = "| № | UK | Повторений |\n|---|----|------------|\n"
+    for i, (uk, cnt) in enumerate(rows, 1):
+        table_md += f"| {i} | {uk} | {cnt} |\n"
+
+    allure.attach(table_md, name="Топ дублей (до 10)", attachment_type=allure.attachment_type.MARKDOWN)
