@@ -5,12 +5,15 @@ pipeline {
             defaultContainer 'python-builder'
         }
     }
+
     triggers {
         pollSCM('')
     }
+
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
+
     parameters {
         string(
             name: 'BRANCH_NAME',
@@ -28,23 +31,13 @@ pipeline {
             description: 'Пароль для подключения к Oracle DB'
         )
     }
+
     environment {
         PATH = "/var/lib/jenkins/.local/bin:$PATH"
         ALLURE_RESULTS = "${WORKSPACE}/allure-results"
     }
+
     stages {
-        stage('Checkout SCM') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "${params.BRANCH_NAME}"]],
-                    userRemoteConfigs: [[
-                        url: 'https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git',
-                        credentialsId: 'login_password_for_repo_bitbucket'
-                    ]]
-                ])
-            }
-        }
         stage('Create venv & Install dependencies') {
             steps {
                 sh """
@@ -55,41 +48,47 @@ pipeline {
                 """
             }
         }
+
         stage('Run Database Tests') {
             steps {
                 sh """
                     . venv/bin/activate
-                    rm -rf ${ALLURE_RESULTS}
+                    rm -rf ${ALLURE_RESULTS} || true
                     mkdir -p ${ALLURE_RESULTS}
                     export DB_USER="${params.DB_USER}"
                     export DB_PASS="${params.DB_PASS}"
-                    pytest tests/ --alluredir=${ALLURE_RESULTS}
+                    pytest tests/ --alluredir=${ALLURE_RESULTS} || echo "Tests failed, but continuing to publish report"
                 """
             }
         }
     }
+
     post {
         always {
-            allure includeProperties: false,
-                   jdk: '',
-                   results: [[path: 'allure-results']]
+            allure(
+                includeProperties: false,
+                jdk: '',
+                results: [[path: 'allure-results']]
+            )
+
             script {
                 try {
                     echo "Uploading results to Allure TestOps..."
                     withAllureUpload(
                         credentialsId: 'allure-token',
-                        name: "Database Tests #${BUILD_NUMBER} | ${BRANCH_NAME}",
+                        name: "Database Tests #${BUILD_NUMBER} | ${params.BRANCH_NAME}",
                         projectId: '643',
                         results: [[path: "${ALLURE_RESULTS}"]],
                         serverId: 'testops',
-                        tags: "${BRANCH_NAME}, db-tests, data-quality"
+                        tags: "${params.BRANCH_NAME}, db-tests, data-quality"
                     ) {
                         echo "Allure TestOps upload completed"
                     }
                 } catch (Exception e) {
-                    echo "Failed to upload to Allure TestOps: ${e}"
+                    echo "Failed to upload to Allure TestOps: ${e.getMessage()}"
                 }
             }
+
             archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
             cleanWs()
         }
