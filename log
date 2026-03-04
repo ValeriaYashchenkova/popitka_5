@@ -1,19 +1,40 @@
 Started by user Валерия Ященкова
 Running as Валерия Ященкова
-Obtained Jenkinsfile from git https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git
+Checking out git https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git into /var/jenkins_home/workspace/test_alm_1@script/b1832f5daf90d5680af12a66a271fc300b49c45fb836b61903df226908a9ecb4 to read Jenkinsfile
+The recommended git tool is: git
+using credential login_password_for_repo_bitbucket
+Wiping out workspace first.
+Cloning the remote Git repository
+Cloning repository https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git
+ > git init /var/jenkins_home/workspace/test_alm_1@script/b1832f5daf90d5680af12a66a271fc300b49c45fb836b61903df226908a9ecb4 # timeout=10
+Fetching upstream changes from https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.39.2'
+using GIT_ASKPASS to set credentials 
+ > git fetch --tags --force --progress -- https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git # timeout=10
+ > git config --add remote.origin.fetch +refs/heads/*:refs/remotes/origin/* # timeout=10
+Avoid second fetch
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+Checking out Revision 5db9aec4ec3478cb5690f75e4653adb85c4f8ff2 (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 5db9aec4ec3478cb5690f75e4653adb85c4f8ff2 # timeout=10
+Commit message: "Jenkinsfile edited online with Bitbucket"
+ > git rev-list --no-walk 5db9aec4ec3478cb5690f75e4653adb85c4f8ff2 # timeout=10
 [Pipeline] Start of Pipeline
 [Pipeline] podTemplate
 [Pipeline] {
 [Pipeline] node
-Created Pod: k8s-platform-cloud jenkins-slaves/test-alm-1-103-8vs62-9l9g7-3nwnk
-Agent test-alm-1-103-8vs62-9l9g7-3nwnk is provisioned from template test_alm_1_103-8vs62-9l9g7
-Running on test-alm-1-103-8vs62-9l9g7-3nwnk in /home/jenkins/agent/workspace/test_alm_1
+Created Pod: k8s-platform-cloud jenkins-slaves/test-alm-1-134-p7f1r-48q3c-lwm7h
+Agent test-alm-1-134-p7f1r-48q3c-lwm7h is provisioned from template test_alm_1_134-p7f1r-48q3c
+Running on test-alm-1-134-p7f1r-48q3c-lwm7h in /home/jenkins/agent/workspace/test_alm_1
 [Pipeline] {
 [Pipeline] stage
 [Pipeline] { (Declarative: Checkout SCM)
 [Pipeline] checkout
 The recommended git tool is: git
 using credential login_password_for_repo_bitbucket
+Wiping out workspace first.
 Cloning the remote Git repository
 Cloning repository https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git
  > git init /home/jenkins/agent/workspace/test_alm_1 # timeout=10
@@ -30,7 +51,6 @@ Commit message: "Jenkinsfile edited online with Bitbucket"
  > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
  > git config core.sparsecheckout # timeout=10
  > git checkout -f 5db9aec4ec3478cb5690f75e4653adb85c4f8ff2 # timeout=10
- > git rev-list --no-walk 5db9aec4ec3478cb5690f75e4653adb85c4f8ff2 # timeout=10
 [Pipeline] }
 [Pipeline] // stage
 [Pipeline] withEnv
@@ -44,9 +64,9 @@ Commit message: "Jenkinsfile edited online with Bitbucket"
 [Pipeline] git
 The recommended git tool is: git
 using credential login_password_for_repo_bitbucket
-Warning: JENKINS-30600: special launcher org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator$1@7e0d7f5d; decorates RemoteLauncher[hudson.remoting.Channel@1bd95801:JNLP4-connect connection from 10.137.41.202/10.137.41.202:37690] will be ignored (a typical symptom is the Git executable not being run inside a designated container)
+Warning: JENKINS-30600: special launcher org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator$1@2ddf4954; decorates RemoteLauncher[hudson.remoting.Channel@44137f39:JNLP4-connect connection from 10.137.24.137/10.137.24.137:39624] will be ignored (a typical symptom is the Git executable not being run inside a designated container)
 Fetching changes from the remote Git repository
-Checking out Revision 6bf20ebfae4a43c52554db4c83397deaf5dccb29 (refs/remotes/origin/test-lera)
+Checking out Revision a7edf160866b33eb412731654057c259a8a70ed7 (refs/remotes/origin/test_py_ex)
 Commit message: "Jenkinsfile edited online with Bitbucket"
  > git rev-parse --resolve-git-dir /home/jenkins/agent/workspace/test_alm_1/.git # timeout=10
  > git config remote.origin.url https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git # timeout=10
@@ -55,12 +75,12 @@ Fetching upstream changes from https://git.moscow.alfaintra.net/scm/bialm_ft/bia
  > git --version # 'git version 2.39.2'
 using GIT_ASKPASS to set credentials 
  > git fetch --tags --force --progress -- https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git +refs/heads/*:refs/remotes/origin/* # timeout=10
- > git rev-parse refs/remotes/origin/test-lera^{commit} # timeout=10
+ > git rev-parse refs/remotes/origin/test_py_ex^{commit} # timeout=10
  > git config core.sparsecheckout # timeout=10
- > git checkout -f 6bf20ebfae4a43c52554db4c83397deaf5dccb29 # timeout=10
+ > git checkout -f a7edf160866b33eb412731654057c259a8a70ed7 # timeout=10
  > git branch -a -v --no-abbrev # timeout=10
- > git checkout -b test-lera 6bf20ebfae4a43c52554db4c83397deaf5dccb29 # timeout=10
- > git rev-list --no-walk be4bd3dced11095f3a669a10762169f4ffb10754 # timeout=10
+ > git checkout -b test_py_ex a7edf160866b33eb412731654057c259a8a70ed7 # timeout=10
+ > git rev-list --no-walk a7edf160866b33eb412731654057c259a8a70ed7 # timeout=10
 [Pipeline] }
 [Pipeline] // stage
 [Pipeline] stage
@@ -92,8 +112,7 @@ Looking in indexes: https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual
 Collecting pip
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/8a/6a/19e9fe04fca059ccf770861c7d5721ab4c2aebc539889e97c7977528a53b/pip-24.0-py3-none-any.whl (2.1 MB)
 Installing collected packages: pip
-
- Attempting uninstall: pip
+  Attempting uninstall: pip
     Found existing installation: pip 20.1.1
     Uninstalling pip-20.1.1:
       Successfully uninstalled pip-20.1.1
@@ -102,18 +121,19 @@ Successfully installed pip-24.0
 Looking in indexes: https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
 Collecting oracledb
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/9c/25/76a9cf9d4741c89a838e449a717f86a670437dd17afd244ee87fffb46d6f/oracledb-2.3.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 9.4 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 4.5 MB/s eta 0:00:00
 Collecting gitpython
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/6a/09/e21df6aef1e1ffc0c816f0522ddc3f6dcded766c3261813131c78a704470/gitpython-3.1.46-py3-none-any.whl (208 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 208.6/208.6 kB 3.8 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 208.6/208.6 kB 6.0 MB/s eta 0:00:00
 Collecting requests
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl (62 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 9.2 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 3.9 MB/s eta 0:00:00
+
 Collecting tomli
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/tomli/2.0.1/tomli-2.0.1-py3-none-any.whl (12 kB)
 Collecting cryptography>=3.2.1 (from oracledb)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/5d/fa/1d5745d878048699b8eb87c984d4ccc5da4f5008dfd3ad7a94040caca23a/cryptography-45.0.7-cp37-abi3-manylinux_2_34_x86_64.whl (4.4 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 11.1 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 5.1 MB/s eta 0:00:00
 Collecting gitdb<5,>=4.0.1 (from gitpython)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/a0/61/5c78b91c3143ed5c14207f463aecfc8f9dbb5092fb2869baf37c273b2705/gitdb-4.0.12-py3-none-any.whl (62 kB)
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.8/62.8 kB 4.7 MB/s eta 0:00:00
@@ -121,24 +141,25 @@ Collecting typing-extensions>=3.10.0.2 (from gitpython)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/ec/6b/63cc3df74987c36fe26157ee12e09e8f9db4de771e0f3404263117e75b95/typing_extensions-4.7.1-py3-none-any.whl (33 kB)
 Collecting charset-normalizer<4,>=2 (from requests)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/0a/4c/925909008ed5a988ccbb72dcc897407e5d6d3bd72410d69e051fc0c14647/charset_normalizer-3.4.4-py3-none-any.whl (53 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.4/53.4 kB 3.4 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.4/53.4 kB 4.8 MB/s eta 0:00:00
 Collecting idna<4,>=2.5 (from requests)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl (70 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.4/70.4 kB 11.3 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.4/70.4 kB 3.7 MB/s eta 0:00:00
 Collecting urllib3<3,>=1.21.1 (from requests)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/d2/b2/b157855192a68541a91ba7b2bbcb91f1b4faa51f8bae38d8005c034be524/urllib3-2.0.7-py3-none-any.whl (124 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 124.2/124.2 kB 6.2 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 124.2/124.2 kB 4.4 MB/s eta 0:00:00
 Collecting certifi>=2017.4.17 (from requests)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl (153 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 153.7/153.7 kB 11.9 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 153.7/153.7 kB 5.1 MB/s eta 0:00:00
 Collecting cffi>=1.14 (from cryptography>=3.2.1->oracledb)
+
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/cffi/1.15.1/cffi-1.15.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (427 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 427.9/427.9 kB 7.2 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 427.9/427.9 kB 6.9 MB/s eta 0:00:00
 Collecting smmap<6,>=3.0.1 (from gitdb<5,>=4.0.1->gitpython)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/packages/packages/04/be/d09147ad1ec7934636ad912901c5fd7667e1c858e19d355237db0d0cd5e4/smmap-5.0.2-py3-none-any.whl (24 kB)
 Collecting pycparser (from cffi>=1.14->cryptography>=3.2.1->oracledb)
   Downloading https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/pycparser/2.21/pycparser-2.21-py2.py3-none-any.whl (118 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 118.7/118.7 kB 9.3 MB/s eta 0:00:00
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 118.7/118.7 kB 5.2 MB/s eta 0:00:00
 Installing collected packages: urllib3, typing-extensions, tomli, smmap, pycparser, idna, charset-normalizer, certifi, requests, gitdb, cffi, gitpython, cryptography, oracledb
 Successfully installed certifi-2026.2.25 cffi-1.15.1 charset-normalizer-3.4.4 cryptography-45.0.7 gitdb-4.0.12 gitpython-3.1.46 idna-3.10 oracledb-2.3.0 pycparser-2.21 requests-2.31.0 smmap-5.0.2 tomli-2.0.1 typing-extensions-4.7.1 urllib3-2.0.7
 [Pipeline] }
@@ -156,10 +177,10 @@ Successfully installed certifi-2026.2.25 cffi-1.15.1 charset-normalizer-3.4.4 cr
 + [ ! nondestructive = nondestructive ]
 + VIRTUAL_ENV=/home/jenkins/agent/workspace/test_alm_1/venv
 + export VIRTUAL_ENV
-+ _OLD_VIRTUAL_PATH=/var/lib/jenkins/.local/bin:/opt/java/openjdk/bin:/
-
++ _OLD_VIRTUAL_PATH=/var/lib/jenkins/.local/bin:/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 + PATH=/home/jenkins/agent/workspace/test_alm_1/venv/bin:/var/lib/jenkins/.local/bin:/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 + export PATH
+
 + [ -n  ]
 + [ -z  ]
 + _OLD_VIRTUAL_PS1=$ 
@@ -169,29 +190,23 @@ Successfully installed certifi-2026.2.25 cffi-1.15.1 charset-normalizer-3.4.4 cr
 + [ -n  -o -n  ]
 + rm -rf allure-results
 + mkdir -p allure-results
-+ python run_test.py --branch test-lera
++ python run_test.py --branch test_py_ex
 /home/jenkins/agent/workspace/test_alm_1/venv/lib/python3.7/site-packages/oracledb/__init__.py:41: UserWarning: Python 3.7 is no longer supported by the Python core team. Therefore, support for it is deprecated in python-oracledb and will be removed in a future release
   warnings.warn(message)
 /home/jenkins/agent/workspace/test_alm_1/venv/lib/python3.7/site-packages/oracledb/__init__.py:43: CryptographyDeprecationWarning: Python 3.7 is no longer supported by the Python core team and support for it is deprecated in cryptography. The next release of cryptography will remove support for Python 3.7.
   from . import base_impl, thick_impl, thin_impl
-Используем git-креды из параметров Jenkins (GIT_USER/GIT_PASS)
-Выполняем git fetch...
-Переключаемся на ветку: test-lera
-Подтягиваем изменения...
-Логин/пароль/DSN к БД взяты из параметров Jenkins или config.toml
+Traceback (most recent call last):
+  File "run_test.py", line 4, in <module>
+    import keyring
+ModuleNotFoundError: No module named 'keyring'
 
-Выполняю проверки...
-→ check_duplicates_accounteqtype_ldim.sql
-
-Готово! Папка allure-results создана.
-Jenkins сам загрузит её в TestOps.
 [Pipeline] }
 [Pipeline] // stage
 [Pipeline] stage
 [Pipeline] { (Declarative: Post Actions)
 [Pipeline] allure
-Unpacking http://binary/artifactory/public/io/qameta/allure/allure-commandline/2.21.0/allure-commandline-2.21.0.zip to /home/jenkins/agent/tools/ru.yandex.qatools.allure.jenkins.tools.AllureCommandlineInstallation/allure-commandline on test-alm-1-103-8vs62-9l9g7-3nwnk
-Executing sh script inside container python-builder of pod test-alm-1-103-8vs62-9l9g7-3nwnk
+Unpacking http://binary/artifactory/public/io/qameta/allure/allure-commandline/2.21.0/allure-commandline-2.21.0.zip to /home/jenkins/agent/tools/ru.yandex.qatools.allure.jenkins.tools.AllureCommandlineInstallation/allure-commandline on test-alm-1-134-p7f1r-48q3c-lwm7h
+Executing sh script inside container python-builder of pod test-alm-1-134-p7f1r-48q3c-lwm7h
 Executing command: "/home/jenkins/agent/tools/ru.yandex.qatools.allure.jenkins.tools.AllureCommandlineInstallation/allure-commandline/allure-2.21.0/bin/allure" "generate" "/home/jenkins/agent/workspace/test_alm_1/allure-results" "-c" "-o" "/home/jenkins/agent/workspace/test_alm_1/allure-report" 
 exit
 Report successfully generated to /home/jenkins/agent/workspace/test_alm_1/allure-report
@@ -203,17 +218,21 @@ Artifact was added to the build.
 [Pipeline] echo
 Uploading results to Allure TestOps (project 643)...
 [Pipeline] withAllureUpload
-[Allure] [460263] Job run [https://testops.moscow.alfaintra.net/jobrun/459563] started....
-[Allure] [460263] Watching on [/home/jenkins/agent/workspace/test_alm_1/allure-results] for session [857689]
+[Allure] [469050] Job run [https://testops.moscow.alfaintra.net/jobrun/462572] started....
+[Allure] [469050] Watching on [/home/jenkins/agent/workspace/test_alm_1/allure-results] for session [862014]
 [Pipeline] {
 [Pipeline] echo
 Allure TestOps upload completed
 [Pipeline] }
-[Allure] [460262] Waiting [20] seconds until all files will be indexed
-[Allure] [460262] Waiting until all files will be uploaded
-[Allure] [460262] Session [857689] total indexed [0], ignored [10], processed [0], errors [0]
-[Allure] [460262] Session [857689] stopped successfully...
-[Allure] [460262] Job run [https://testops.moscow.alfaintra.net/jobrun/459563] stopped successfully...
+[Allure] [469147] Waiting [20] seconds until all files will be indexed
+[Allure] [469147] Waiting until all files will be uploaded
+[Allure] [469147] Session [862014] total indexed [0], ignored [7], processed [0], errors [0]
+[Allure] [469147] Session [862014] stopped successfully...
+[Allure] [469147] Waiting [20] seconds until all files will be indexed
+[Allure] [469147] Waiting until all files will be uploaded
+[Allure] [469147] Session [862014] total indexed [0], ignored [7], processed [0], errors [0]
+[Allure] [469147] Session [862014] stopped successfully...
+[Allure] [469147] Job run [https://testops.moscow.alfaintra.net/jobrun/462572] stopped successfully...
 [Pipeline] // withAllureUpload
 [Pipeline] }
 [Pipeline] // script
@@ -236,25 +255,6 @@ Archiving artifacts
 [Pipeline] }
 [Pipeline] // podTemplate
 [Pipeline] End of Pipeline
-/var/jenkins_home/workspace/test_alm_1@tmp/jfrog/103/.jfrog deleted
-Finished: SUCCESS
-
-
-
-Build Artifacts
-allure-report.zip	964.30 KB	 посмотреть
-70c32eb0-a4e9-4471-8246-502eed57fbad-result.json	609 B	 посмотреть
-categories.json	146 B	 посмотреть
-environment.json	118 B	 посмотреть
-executor.json	204 B	 посмотреть
-categories-trend.json	1.94 KB	 посмотреть
-duration-trend.json	2.05 KB	 посмотреть
-history-trend.json	3.23 KB	 посмотреть
-history.json	7.47 KB	 посмотреть
-retry-trend.json	2.27 KB	 посмотреть
-testrun.json	69 B	 посмотреть
-allure-testops-session-857689.zip	634 B	 посмотреть
-
-
-Workspaces for test_alm_1 #103
-/home/jenkins/agent/workspace/test_alm_1 on test-alm-1-103-8vs62-9l9g7-3nwnk
+ERROR: script returned exit code 1
+/var/jenkins_home/workspace/test_alm_1@tmp/jfrog/134/.jfrog deleted
+Finished: FAILURE
