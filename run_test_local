@@ -1,0 +1,79 @@
+import os
+import sys
+import getpass
+import oracledb
+import pytest
+import allure
+from glob import glob
+
+# =============================================
+# Запрос логина и пароля к БД (один раз)
+# =============================================
+
+print("\n=== Ввод параметров для подключения к БД ===")
+DB_USER = input("Логин Oracle DB: ").strip()
+DB_PASS = getpass.getpass("Пароль Oracle DB: ").strip()
+DB_DSN = input("DSN (по умолчанию BIDBTST1:1521/DB12TST2): ").strip() or "BIDBTST1:1521/DB12TST2"
+
+# =============================================
+# Фикстура подключения к БД
+# =============================================
+
+@pytest.fixture(scope="session")
+def db_connection():
+    try:
+        conn = oracledb.connect(user=DB_USER, password=DB_PASS, dsn=DB_DSN)
+        print("Подключение к БД успешно!")
+        yield conn
+    except oracledb.Error as e:
+        pytest.fail(f"Ошибка подключения к БД: {e}")
+    finally:
+        conn.close()
+
+# =============================================
+# Список всех .sql-файлов
+# =============================================
+
+def get_sql_files():
+    tests_dir = "tests"  # или путь к твоей папке с .sql
+    return sorted(glob(os.path.join(tests_dir, "check_duplicates_*.sql")))
+
+# =============================================
+# Один тест на каждый .sql-файл
+# =============================================
+
+@pytest.mark.parametrize("sql_file", get_sql_files(), ids=lambda x: os.path.basename(x))
+def test_duplicate_check(sql_file, db_connection):
+    file_name = os.path.basename(sql_file)
+    
+    @allure.title(f"Проверка дубликатов в таблице/файле: {file_name}")
+    @allure.description(f"""
+    Выполняем SQL-запрос из файла **{file_name}**  
+    Ожидаем, что результат будет пустым (дубликатов нет).
+    """)
+    @allure.severity(allure.severity_level.NORMAL)
+    @allure.tag("duplicates", "sql", "database", "regression")
+    @allure.label("owner", "Валерия Ященкова")
+    def run_test():
+        with allure.step(f"Чтение и выполнение SQL из файла {file_name}"):
+            sql = open(sql_file, 'r', encoding='utf-8').read().rstrip(' \n;')
+            cursor = db_connection.cursor()
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            
+            if rows:
+                details = "\n".join(str(row) for row in rows)
+                allure.attach(
+                    details,
+                    name="Найденные дубликаты",
+                    attachment_type=allure.attachment_type.TEXT
+                )
+                pytest.fail(f"Найдено {len(rows)} наборов дубликатов")
+            else:
+                allure.attach(
+                    "Дубликатов не найдено — всё OK",
+                    name="Результат",
+                    attachment_type=allure.attachment_type.TEXT
+                )
+    
+    run_test()
