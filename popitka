@@ -1,0 +1,215 @@
+Мне нужно написать фреймворк для запуска тестов на базе данных с использованием дженкинса и публикацией allure-отчетов в TestOps. Мои тесты лежат в репозитории в битбакет: https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git . Дженкинс с ним связан, у него есть креды для подключения к этому репозиторию с id login_password_for_repo_bitbucket . С тестопс он так же свзяан, у него есть апи-токен, также лежит в кредах с id allure-token. В Дженкинс также лежат параметры, для подключения к базе данных, на которых производится тест (логин и пароль DB_USER и DB_PASS). Нужно чтобы программа подхватывала эти параметры и вставляла в тест.
+Пример теста, который лежит в tests: 
+import pytest
+import allure
+import oracledb
+from typing import List, Tuple
+
+
+# -------------------------------------------------------------------------
+#  Фикстуры
+# -------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def oracle_connection() -> oracledb.Connection:
+    """Создаёт и возвращает соединение с базой. Закрывает после всех тестов."""
+    # Здесь вы потом подставите настоящие значения
+    user = "login" -  - здесь нужно вставить параметр из jenkins
+    password = "pass"-  - здесь нужно вставить параметр из jenkins
+
+    dsn = "BIDBTST1:1521/DB12TST2"
+
+    try:
+        conn = oracledb.connect(user=user, password=password, dsn=dsn)
+        allure.attach(f"Подключились к {dsn} пользователем {user}", attachment_type=allure.attachment_type.TEXT)
+        yield conn
+    except oracledb.Error as e:
+        allure.attach(str(e), name="Ошибка подключения", attachment_type=allure.attachment_type.TEXT)
+        pytest.fail(f"Не удалось подключиться к базе: {e}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
+            allure.attach("Соединение с базой закрыто", attachment_type=allure.attachment_type.TEXT)
+
+
+@pytest.fixture
+def duplicates_query() -> str:
+    return """
+    SELECT UK, COUNT(*) AS cnt
+    FROM DMALM.ACCOUNTEQTYPE_LDIM
+    GROUP BY UK
+    HAVING COUNT(*) > 1
+    ORDER BY cnt DESC
+    """
+
+
+# -------------------------------------------------------------------------
+#  Сам тест
+# -------------------------------------------------------------------------
+
+@allure.epic("Проверка качества данных")
+@allure.feature("DMALM.ACCOUNTEQTYPE_LDIM")
+@allure.story("Отсутствие дублей по полю UK")
+@allure.title("В таблице ACCOUNTEQTYPE_LDIM не должно быть дублей по UK")
+@allure.description(
+    "Проверяем, что запрос на поиск дублей возвращает пустой результат.\n"
+    "Если есть хотя бы одна строка → тест падает + прикладываем результат в отчёт."
+)
+@allure.severity(allure.severity_level.CRITICAL)
+@allure.label("layer", "integration")
+@allure.tag("oracle", "data-quality", "deduplication")
+def test_no_duplicates_by_uk(oracle_connection: oracledb.Connection, duplicates_query: str):
+    with allure.step("Выполняем запрос на поиск дублей"):
+        cursor = oracle_connection.cursor()
+        cursor.execute(duplicates_query)
+        rows: List[Tuple[str, int]] = cursor.fetchall()
+        cursor.close()
+
+    count_duplicates = len(rows)
+
+    # Прикладываем результат в любом случае (удобно для анализа)
+    if rows:
+        table_md = "| UK | Кол-во повторений |\n|----|--------------------|\n"
+        for uk, cnt in rows:
+            table_md += f"| {uk} | {cnt} |\n"
+        allure.attach(table_md, name="Найденные дубли", attachment_type=allure.attachment_type.MARKDOWN)
+    else:
+        allure.attach("Дублей не найдено ✓", attachment_type=allure.attachment_type.TEXT)
+
+    with allure.step(f"Проверяем, что дублей нет (найдено: {count_duplicates})"):
+        assert count_duplicates == 0, f"Обнаружено {count_duplicates} групп с дублирующимся UK"
+
+
+# -------------------------------------------------------------------------
+#  Дополнительный удобный тест — просто покажет топ-дубли (не падает)
+# ----------------s---------------------------------------------------------
+
+@allure.title("Показать топ-10 дублей по UK (информационный)")
+@allure.description("Не падает, просто выводит в отчёт самые большие группы дублей, если они есть")
+def test_show_top_duplicates(oracle_connection: oracledb.Connection, duplicates_query: str):
+    with allure.step("Выполняем запрос"):
+        cursor = oracle_connection.cursor()
+        cursor.execute(duplicates_query)
+        rows = cursor.fetchmany(10)  # только топ-10
+        cursor.close()
+
+    if not rows:
+        allure.attach("Дублей нет", name="Результат", attachment_type=allure.attachment_type.TEXT)
+        return
+
+    table_md = "| № | UK | Повторений |\n|---|----|------------|\n"
+    for i, (uk, cnt) in enumerate(rows, 1):
+        table_md += f"| {i} | {uk} | {cnt} |\n"
+
+    allure.attach(table_md, name="Топ дублей (до 10)", attachment_type=allure.attachment_type.MARKDOWN)
+
+Нужно, чтобы программа запускала этот тест через команду pytest название_теста --alluredir=allure-results и  получала результаты в allure-формате. А Далее публиковала их в Testops. 
+Вот пример рабочего дженкинсфайла, но его нужно переписать под мой запрос, данные для тестопса в шаге withallureapload корректны: 
+pipeline {
+    agent {
+        kubernetes {
+            inheritFrom 'python'
+            defaultContainer 'python-builder'
+        }
+    }
+
+    triggers {
+        pollSCM('')
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+
+    parameters {
+        string(
+            name: 'BRANCH_NAME',
+            defaultValue: 'master',
+            description: 'Ветка для проверки дубликатов'
+        )
+        string(
+            name: 'DB_USER',
+            defaultValue: '',
+            description: 'Логин для подключения к Oracle DB'
+        )
+        password(
+            name: 'DB_PASS',
+            defaultValue: '',
+            description: 'Пароль для подключения к Oracle DB'
+        )
+    }
+
+    environment {
+        PATH = "/var/lib/jenkins/.local/bin:$PATH"
+        ALLURE_RESULTS = "${WORKSPACE}/allure-results"
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "${params.BRANCH_NAME}"]],
+                    userRemoteConfigs: [[
+                        url: 'https://git.moscow.alfaintra.net/scm/bialm_ft/bialm_ft_auto.git',
+                        credentialsId: 'git_pass'
+                    ]]
+                ])
+            }
+        }
+
+        stage('Create venv & Install dependencies') {
+            steps {
+                sh """
+                    python3.7 -m venv venv || true
+                    . venv/bin/activate
+                    pip3.7 install --upgrade pip -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                    pip3.7 install oracledb gitpython requests tomli pytest allure-pytest -i https://binary.alfabank.ru/artifactory/api/pypi/pipy-virtual/simple
+                """
+            }
+        }
+
+        stage('Run Duplicate Checks') {
+            steps {
+                sh """
+                    . venv/bin/activate
+                    rm -rf ${ALLURE_RESULTS}
+                    mkdir -p ${ALLURE_RESULTS}
+                    export DB_USER="${params.DB_USER}"
+                    export DB_PASS="${params.DB_PASS}"
+                    pytest run_test.py --alluredir=${ALLURE_RESULTS}
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            allure includeProperties: false,
+                   jdk: '',
+                   results: [[path: 'allure-results']]
+
+            script {
+                try {
+                    echo "Uploading results to Allure TestOps..."
+                    withAllureUpload(
+                        credentialsId: 'allure-token',
+                        name: "Duplicate Checks #${BUILD_NUMBER} | ${BRANCH_NAME}",
+                        projectId: '643',
+                        results: [[path: "${ALLURE_RESULTS}"]],
+                        serverId: 'testops',
+                        tags: "${BRANCH_NAME}, sql-duplicates-check"
+                    ) {
+                        echo "Allure TestOps upload completed"
+                    }
+                } catch (Exception e) {
+                    echo "Failed to upload to Allure TestOps: ${e}"
+                }
+            }
+
+            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
+            cleanWs()
+        }
+    }
+} 
