@@ -1,0 +1,42 @@
+import pytest
+import allure
+import os
+import oracledb
+
+
+@pytest.fixture(scope="session")
+def connection():
+    user = os.environ["DB_USER"]
+    pw = os.environ["DB_PASS"]
+    dsn = os.environ.get("DB_DSN", "BIDBTST1:1521/DB12TST2")
+    conn = oracledb.connect(user=user, password=pw, dsn=dsn)
+    yield conn
+    conn.close()
+
+
+@allure.title("Проверка на дубли по UK в ACCOUNTEQTYPE_LDIM")
+@allure.feature("Целостность справочника")
+@allure.story("Отсутствие дублей по UK")
+def test_no_duplicates(connection):
+    query = """
+    SELECT UK, COUNT(*) AS cnt
+    FROM DMALM.ACCOUNTEQTYPE_LDIM
+    GROUP BY UK
+    HAVING COUNT(*) > 1
+    ORDER BY cnt DESC
+    """
+
+    with allure.step("Выполняем запрос на поиск дублей"):
+        cursor = connection.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        if rows:
+            allure.attach(
+                "\n".join(str(row) for row in rows),
+                name="Найденные дубли",
+                attachment_type=allure.attachment_type.TEXT
+            )
+            pytest.fail(f"Найдено {len(rows)} групп с дублями по UK")
+        else:
+            allure.attach("Дублей не найдено", name="Результат", attachment_type=allure.attachment_type.TEXT)
